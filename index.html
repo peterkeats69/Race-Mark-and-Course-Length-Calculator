@@ -480,20 +480,21 @@ function compute(){
     const u23=vec(axis+d.b23);
     const uGate=vec(axis+90);
 
+    // Gate centres are the course-geometry anchors.
+    // The physical P marks are then offset from the centres by half the gate width.
     const gate4C = add(pMid, scale(uA, off));
     const p4P = add(gate4C, scale(uGate, gw/2));
 
-    const p1 = add(p4P, scale(u41, lenM));
+    const p1 = add(gate4C, scale(u41, lenM));
     const p2 = add(p1, scale(u12, rM));
-    const p3P = add(p2, scale(u23, lenM));
-    const gate3C = add(p3P, scale(uGate, -g3w/2));
+    const gate3C = add(p2, scale(u23, lenM));
+    const p3P = add(gate3C, scale(uGate, g3w/2));
 
     html += `<div class="section"><h3>CB Reference (Trapezoid)</h3>
       ${card("CB","4P",pCB,p4P)}
       ${card("CB","1",pCB,p1)}
       ${card("CB","2",pCB,p2)}
       ${card("CB","3P",pCB,p3P)}
-      ${g3w>0 ? card("CB","Gate 3 Centre",pCB,gate3C) : ""}
     </div>`;
 
     if(hybOn){
