@@ -1,27 +1,20 @@
-const CACHE_NAME = 'race-course-calculator-june-2026-v1';
-
+const CACHE_NAME = 'race-course-calculator-25 June 2026 - v4';
 const ASSETS = [
   './',
   './index.html',
   './manifest.webmanifest',
-  './sw.js',
-  './icons/icon-192.png',
-  './icons/icon-512.png'
+  './sw.js'
+  // add icons here later like './icons/icon-192.png'
 ];
 
 self.addEventListener('install', (e) => {
-  e.waitUntil(
-    caches.open(CACHE_NAME).then(cache => cache.addAll(ASSETS))
-  );
+  e.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(ASSETS)));
 });
 
 self.addEventListener('activate', (e) => {
   e.waitUntil(
     caches.keys().then(keys =>
-      Promise.all(
-        keys.map(k => k === CACHE_NAME ? null : caches.delete(k))
-      )
-    )
+      Promise.all(keys.map(k => (k === CACHE_NAME ? null : caches.delete(k)))))
   );
 });
 
