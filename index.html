@@ -124,7 +124,7 @@
         <input id="hybridReachPct" type="number" step="0.1" value="67">
       </label>
     </div>
-    <div class="note">Hybrid planner is for shared trapezoid racing: outer fleet uses the outer loop, inner fleet uses Hybrid Gate 4. It suggests the Hybrid 4→1 length only; the geometry engine below is unchanged.</div>
+    <div class="note">Hybrid planner is for shared trapezoid racing: outer fleet uses the outer loop, inner fleet uses Hybrid Gate 4. It suggests the Hybrid gate centre→1 length only; the standard geometry remains unchanged.</div>
   </div>
 
   <div id="plannerResults" class="section"></div>
@@ -194,10 +194,10 @@
     <input type="checkbox" id="hybOn" style="transform:scale(1.2);margin-right:8px">
     Enable Hybrid Gate 4
   </label>
-  <label id="hybMwrap" class="hidden">Hybrid leg 4P→1 (m)
+  <label id="hybMwrap" class="hidden">Hybrid centre→1 (m)
     <input id="hybLegM" type="number" value="0">
   </label>
-  <label id="hybNmwrap" class="hidden">Hybrid leg 4P→1 (nm)
+  <label id="hybNmwrap" class="hidden">Hybrid centre→1 (nm)
     <input id="hybLegNm" type="number" step="0.001" value="0.000">
   </label>
 </div>
@@ -693,11 +693,11 @@ function computePlanner(apply){
       } else if(h.hybridNm<=0){
         output.push('Hybrid Gate 4 would calculate as zero or negative for these settings; the inner fleet fixed legs are already too long for the target time.');
       } else if(h.hybridNm>outerBeatNm){
-        output.push(`Suggested Hybrid 4→1 length: ${h.hybridNm.toFixed(3)} nm (${Math.round(h.hybridNm*1852)} m) — longer than the outer beat, so check target/class/wind assumptions.`);
+        output.push(`Suggested Hybrid gate centre→1 length: ${h.hybridNm.toFixed(3)} nm (${Math.round(h.hybridNm*1852)} m) — longer than the outer beat, so check target/class/wind assumptions.`);
       } else {
-        output.push(`Suggested Hybrid 4→1 length: ${h.hybridNm.toFixed(3)} nm (${Math.round(h.hybridNm*1852)} m)`);
+        output.push(`Suggested Hybrid gate centre→1 length: ${h.hybridNm.toFixed(3)} nm (${Math.round(h.hybridNm*1852)} m)`);
       }
-      output.push(`Hybrid timing model: fixed outer legs plus ${h.variableCount} hybrid repeat${h.variableCount===1?'':'s'} between Mark 1 and Hybrid 4.`);
+      output.push(`Hybrid timing model: fixed outer legs plus ${h.variableCount} hybrid repeat${h.variableCount===1?'':'s'} between Mark 1 and the Hybrid gate centre.`);
     }
   }
 
@@ -800,7 +800,11 @@ function compute(){
       if(legM<0) legM=0;
       if(legM>lenM) legM=lenM;
 
-      const pH4P = add(p1, scale(u41, -legM));
+      // Hybrid Gate 4 uses the same centre-anchor rule as standard Gate 4.
+      // The hybrid gate centre is directly below Mark 1; Hybrid 4P is then
+      // offset to starboard/right by half the Gate 4 width.
+      const h4C = add(p1, scale(u41, -legM));
+      const pH4P = add(h4C, scale(uGate, gw/2));
       html += `<div class="section"><h3>Hybrid Gate 4</h3>
         ${card("CB","Hybrid 4P",pCB,pH4P)}
         ${card("Hybrid 4P","1",pH4P,p1)}
