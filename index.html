@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Multi Course Race Calculator — Planner Beta 2.3</title>
+<title>Multi Course Race Calculator — Planner Beta 2.5</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="manifest" href="./manifest.webmanifest">
 <meta name="theme-color" content="#0d355f">
@@ -35,7 +35,7 @@
 </head>
 <body>
 
-<h2>Multi Course Race Calculator — Planner Beta 2.3</h2>
+<h2>Multi Course Race Calculator — Planner Beta 2.5</h2>
 <p class="build">Includes: optional Course Length Calculator, Trapezoid (60/70/80), Triangle, 90° Gybe, Windward-Leeward (with optional spreader 1a).</p>
 
 <div class="plannerToggle">
@@ -212,8 +212,22 @@
     No Gate 4
   </label>
 
-  <label>Upwind offset from start-line midpoint (m)
-    <input id="wlGateOff" type="number" value="93">
+  <label>Race Office Position
+    <select id="wlOfficePosition">
+      <option value="custom" selected>Close to Gate / Custom</option>
+      <option value="halfway">Halfway Up Course</option>
+    </select>
+  </label>
+
+  <label id="wlGateOffWrap"><span id="wlGateOffLabel">Gate centre→start-line midpoint (m)</span>
+    <input id="wlGateOff" type="number" step="1" value="93">
+  </label>
+
+  <label id="wlGateOffUnitWrap">Offset Unit
+    <select id="wlGateOffUnit">
+      <option value="m" selected>Metres</option>
+      <option value="nm">Nautical miles</option>
+    </select>
   </label>
 
   <label style="font-weight:900">
@@ -240,7 +254,7 @@
 </div>
 
 <div class="section" id="results"></div>
-<div class="footer">Multi Course Race Calculator — Planner Beta 2.3 © Peter Keats 2026</div>
+<div class="footer">Multi Course Race Calculator — Planner Beta 2.4 © Peter Keats 2026</div>
 
 <script>
 const SPEED_DATA = {
@@ -738,6 +752,9 @@ function compute(){
   show('trapInputs', t==='trapezoid');
   show('hybridRow', t==='trapezoid');
   show('wlInputs', t==='windwardleeward');
+  const wlOfficePosition = el('wlOfficePosition').value;
+  show('wlGateOffWrap', t==='windwardleeward' && wlOfficePosition==='custom');
+  show('wlGateOffUnitWrap', t==='windwardleeward' && wlOfficePosition==='custom');
 
   const hybOn = el('hybOn').checked;
   show('hybMwrap', t==='trapezoid' && hybOn);
@@ -859,9 +876,17 @@ function compute(){
   if(t==='windwardleeward'){
     const wlNoGate4=el('wlNoGate4').checked;
     const gw=wlNoGate4 ? 0 : num('wlGate4W',30);
-    const off=num('wlGateOff',93);
+    // Distance from the gate centre up the course to the start-line midpoint.
+    // The gate centre therefore lies directly downwind/below the line midpoint.
+    const customOfficeValue=num('wlGateOff',93);
+    const customOfficeMetres=el('wlGateOffUnit').value==='nm'
+      ? customOfficeValue*1852
+      : customOfficeValue;
+    const officeUpCourse = el('wlOfficePosition').value==='halfway'
+      ? lenM/2
+      : customOfficeMetres;
 
-    const gateC = add(pMid, scale(uA, off));
+    const gateC = add(pMid, scale(uA, -officeUpCourse));
     const p4P = add(gateC, scale(uR, gw/2));
     const pAxisTop = add(gateC, scale(uA, lenM));
 
@@ -904,7 +929,7 @@ function compute(){
 [
   'courseType','axis','lineLen','gateOff',
   'trapAngle','gate4W','gate3W','noGate4',
-  'wlGate4W','wlGateOff','wlAng','wlNoGate4','showPlanner'
+  'wlGate4W','wlGateOff','wlGateOffUnit','wlOfficePosition','wlAng','wlNoGate4','showPlanner'
 ].forEach(id=>{
   const e=el(id);
   if(!e) return;
@@ -941,6 +966,27 @@ el('reachNm').addEventListener('input', syncReachFromNm);
 el('hybOn').addEventListener('change', compute);
 el('hybLegM').addEventListener('input', ()=>syncHybrid('m'));
 el('hybLegNm').addEventListener('input', ()=>syncHybrid('nm'));
+
+
+function changeWLOffsetUnit(){
+  const unit=el('wlGateOffUnit').value;
+  const input=el('wlGateOff');
+  const current=num('wlGateOff', unit==='nm' ? 0.05 : 93);
+  const previous=input.dataset.unit || 'm';
+
+  if(previous!==unit){
+    if(unit==='nm') input.value=(current/1852).toFixed(3);
+    else input.value=Math.round(current*1852);
+  }
+
+  input.dataset.unit=unit;
+  input.step=unit==='nm' ? '0.001' : '1';
+  el('wlGateOffLabel').textContent=`Gate centre→start-line midpoint (${unit})`;
+  compute();
+}
+
+el('wlGateOff').dataset.unit=el('wlGateOffUnit').value;
+el('wlGateOffUnit').addEventListener('change', changeWLOffsetUnit);
 
 el('wlUseSp').addEventListener('change', compute);
 el('wlPerfect').addEventListener('change', compute);
