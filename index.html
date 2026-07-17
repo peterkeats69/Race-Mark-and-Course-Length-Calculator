@@ -335,6 +335,24 @@ const SPEED_DATA = {
 
 function toRad(d){return d*Math.PI/180}
 function norm(d){return (d%360+360)%360}
+
+/* ============================================================
+   GEOMETRY FREEZE — VERSION 1.0 BASELINE
+   ------------------------------------------------------------
+   The coordinate geometry, point placement, bearings, distances,
+   reciprocals, gate-centre logic, committee-boat positioning and
+   course-shape calculations below are the approved baseline.
+
+   Future changes should be limited to:
+   - user-interface wording and layout
+   - additional display options
+   - convenience features
+   - new course types implemented in separate functions
+
+   Do not alter existing geometry without a deliberate regression
+   check against this frozen baseline.
+   ============================================================ */
+
 function vec(b){return {x:Math.sin(toRad(b)), y:Math.cos(toRad(b))}}
 function add(p,q){return {x:p.x+q.x, y:p.y+q.y}}
 function scale(v,s){return {x:v.x*s, y:v.y*s}}
