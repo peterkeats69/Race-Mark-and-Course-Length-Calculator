@@ -219,8 +219,15 @@
     </select>
   </label>
 
-  <label id="wlGateOffWrap"><span id="wlGateOffLabel">Gate centre→start-line midpoint (m)</span>
-    <input id="wlGateOff" type="number" step="1" value="93">
+  <label id="wlGateSideWrap">Gate Position
+    <select id="wlGateSide">
+      <option value="downwind" selected>Downwind of start line</option>
+      <option value="upwind">Upwind of start line</option>
+    </select>
+  </label>
+
+  <label id="wlGateOffWrap"><span id="wlGateOffLabel">Gate centre↔start-line midpoint (m)</span>
+    <input id="wlGateOff" type="number" min="0" step="1" value="93">
   </label>
 
   <label id="wlGateOffUnitWrap">Offset Unit
@@ -876,17 +883,19 @@ function compute(){
   if(t==='windwardleeward'){
     const wlNoGate4=el('wlNoGate4').checked;
     const gw=wlNoGate4 ? 0 : num('wlGate4W',30);
-    // Distance from the gate centre up the course to the start-line midpoint.
-    // The gate centre therefore lies directly downwind/below the line midpoint.
-    const customOfficeValue=num('wlGateOff',93);
+    // User selects whether Gate 4 is downwind or upwind of the start-line midpoint.
+    // The entered separation remains a simple positive distance.
+    const customOfficeValue=Math.abs(num('wlGateOff',93));
     const customOfficeMetres=el('wlGateOffUnit').value==='nm'
       ? customOfficeValue*1852
       : customOfficeValue;
-    const officeUpCourse = el('wlOfficePosition').value==='halfway'
+    const selectedOfficeDistance = el('wlOfficePosition').value==='halfway'
       ? lenM/2
       : customOfficeMetres;
+    const gateDirection = el('wlGateSide').value==='upwind' ? 1 : -1;
+    const officeSignedOffset = selectedOfficeDistance * gateDirection;
 
-    const gateC = add(pMid, scale(uA, -officeUpCourse));
+    const gateC = add(pMid, scale(uA, officeSignedOffset));
     const p4P = add(gateC, scale(uR, gw/2));
     const pAxisTop = add(gateC, scale(uA, lenM));
 
@@ -981,12 +990,13 @@ function changeWLOffsetUnit(){
 
   input.dataset.unit=unit;
   input.step=unit==='nm' ? '0.001' : '1';
-  el('wlGateOffLabel').textContent=`Gate centre→start-line midpoint (${unit})`;
+  el('wlGateOffLabel').textContent=`Gate centre↔start-line midpoint (${unit})`;
   compute();
 }
 
 el('wlGateOff').dataset.unit=el('wlGateOffUnit').value;
 el('wlGateOffUnit').addEventListener('change', changeWLOffsetUnit);
+el('wlGateSide').addEventListener('change', compute);
 
 el('wlUseSp').addEventListener('change', compute);
 el('wlPerfect').addEventListener('change', compute);
