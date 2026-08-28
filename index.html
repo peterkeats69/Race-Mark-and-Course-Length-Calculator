@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Multi Course Race Calculator — Planner Beta 2.5</title>
+<title>Multi Course Race Calculator — Geometry Frozen v1.1</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="manifest" href="./manifest.webmanifest">
 <meta name="theme-color" content="#0d355f">
@@ -156,6 +156,13 @@
   <label>Course Length (nm)
     <input id="courseLenNm" type="number" step="0.001" value="0.600">
   </label>
+
+  <label id="courseLenRefWrap">Course Length Reference
+    <select id="courseLenRef">
+      <option value="leeward" selected>Leeward mark / Gate 4</option>
+      <option value="start">Start-line midpoint</option>
+    </select>
+  </label>
 </div>
 
 <div id="trapInputs" class="row">
@@ -186,6 +193,15 @@
 
   <label>Reach (nm)
     <input id="reachNm" type="number" step="0.001">
+  </label>
+
+  <label style="font-weight:900">
+    <input type="checkbox" id="trapInnerOn" style="transform:scale(1.2);margin-right:8px">
+    Add inner marks 1a &amp; 2a
+  </label>
+
+  <label id="trapInnerDropWrap" class="hidden">1a / 2a below 1 / 2 (m)
+    <input id="trapInnerDropM" type="number" min="0" step="1" value="100">
   </label>
 </div>
 
@@ -261,7 +277,7 @@
 </div>
 
 <div class="section" id="results"></div>
-<div class="footer">Multi Course Race Calculator — Planner Beta 2.4 © Peter Keats 2026</div>
+<div class="footer">Multi Course Race Calculator — Geometry Frozen v1.1 © Peter Keats 2026</div>
 
 <script>
 const SPEED_DATA = {
@@ -744,7 +760,11 @@ function computePlanner(apply){
 
   if(apply){
     el('courseType').value=applyCourse;
-    el('courseLenNm').value=beatNm.toFixed(3);
+    const appliedCourseLenNm =
+      (applyCourse!=='windwardleeward' && el('courseLenRef').value==='start')
+        ? beatNm + (num('gateOff',93)/1852)
+        : beatNm;
+    el('courseLenNm').value=appliedCourseLenNm.toFixed(3);
     if(applyCourse==='trapezoid'){
       el('reachPct').value=reachPct.toFixed(1);
       el('reachNm').value=reachNm.toFixed(3);
@@ -777,6 +797,8 @@ function compute(){
   show('trapInputs', t==='trapezoid');
   show('hybridRow', t==='trapezoid');
   show('wlInputs', t==='windwardleeward');
+  show('courseLenRefWrap', t!=='windwardleeward');
+  show('trapInnerDropWrap', t==='trapezoid' && el('trapInnerOn').checked);
   const wlOfficePosition = el('wlOfficePosition').value;
   show('wlGateOffWrap', t==='windwardleeward' && wlOfficePosition==='custom');
   show('wlGateOffUnitWrap', t==='windwardleeward' && wlOfficePosition==='custom');
@@ -807,6 +829,14 @@ function compute(){
     const g3w=num('gate3W',30);
     const off=num('gateOff',93);
 
+    // INPUT ADAPTER ONLY — frozen trapezoid geometry remains unchanged.
+    // If the race officer measures Course Length from the start-line midpoint,
+    // convert that measurement to the existing Gate 4 centre→Mark 1 geometry leg.
+    // Positive 'off' means Gate 4 is upwind of the start-line midpoint.
+    const beatLenM = el('courseLenRef').value==='start'
+      ? Math.max(0, lenM - off)
+      : lenM;
+
     let rNm=parseFloat(el('reachNm').value);
     const pct=num('reachPct',67);
     if(!(rNm>0)) rNm = courseNm*(pct/100);
@@ -823,15 +853,34 @@ function compute(){
     const gate4C = add(pMid, scale(uA, off));
     const p4P = add(gate4C, scale(uGate, gw/2));
 
-    const p1 = add(gate4C, scale(u41, lenM));
+    const p1 = add(gate4C, scale(u41, beatLenM));
     const p2 = add(p1, scale(u12, rM));
-    const gate3C = add(p2, scale(u23, lenM));
+    const gate3C = add(p2, scale(u23, beatLenM));
     const p3P = add(gate3C, scale(uGate, g3w/2));
+
+    // DERIVED POINTS ONLY — do not alter Marks 1, 2, Gate 3 or Gate 4.
+    // 1a and 2a are shifted equally down the existing course axis,
+    // so the 1a→2a reach is exactly the same vector/width as 1→2.
+    const innerOn = el('trapInnerOn').checked;
+    const innerDropM = Math.max(0, num('trapInnerDropM',100));
+    const p1a = innerOn ? add(p1, scale(uA, -innerDropM)) : null;
+    const p2a = innerOn ? add(p2, scale(uA, -innerDropM)) : null;
+
+    if(el('courseLenRef').value==='start'){
+      html += `<div class="section"><h3>Course Length Reference</h3>
+        ${resultCard("Start-line midpoint → Mark 1", [
+          `${courseNm.toFixed(3)} nm (${Math.round(lenM)} m)`,
+          `Gate 4 centre → Mark 1: ${(beatLenM/1852).toFixed(3)} nm (${Math.round(beatLenM)} m)`
+        ])}
+      </div>`;
+    }
 
     html += `<div class="section"><h3>CB Reference (Trapezoid)</h3>
       ${card("CB","4P",pCB,p4P)}
       ${card("CB","1",pCB,p1)}
+      ${innerOn ? card("CB","1a",pCB,p1a) : ""}
       ${card("CB","2",pCB,p2)}
+      ${innerOn ? card("CB","2a",pCB,p2a) : ""}
       ${card("CB","3P",pCB,p3P)}
     </div>`;
 
@@ -840,7 +889,7 @@ function compute(){
       const legNm=num('hybLegNm',0);
       if(!(legM>0) && legNm>0) legM=Math.round(legNm*1852);
       if(legM<0) legM=0;
-      if(legM>lenM) legM=lenM;
+      if(legM>beatLenM) legM=beatLenM;
 
       // Hybrid Gate 4 uses the same centre-anchor rule as standard Gate 4.
       // The hybrid gate centre is directly below Mark 1; Hybrid 4P is then
@@ -859,12 +908,26 @@ function compute(){
       ${card("2","3P",p2,p3P)}
       ${card("3P","4P",p3P,p4P)}
     </div>`;
+
+    if(innerOn){
+      html += `<div class="section"><h3>Inner Course — 1a / 2a</h3>
+        ${card("4P","1a",p4P,p1a)}
+        ${card("1a","2a",p1a,p2a)}
+        ${card("2a","3P",p2a,p3P)}
+        ${card("3P","4P",p3P,p4P)}
+      </div>`;
+    }
   }
 
   if(t==='triangle'){
     const off=num('gateOff',93);
+    // INPUT ADAPTER ONLY: start-line reference is converted to the existing
+    // leeward-mark→Mark 1 leg. The triangular geometry itself is unchanged.
+    const beatLenM = el('courseLenRef').value==='start'
+      ? Math.max(0, lenM - off)
+      : lenM;
     const p3 = add(pMid, scale(uA,off));
-    const p1 = add(p3, scale(uA, lenM));
+    const p1 = add(p3, scale(uA, beatLenM));
     const p2 = add(p1, scale(vec(axis+240), lenM));
 
     html += `<div class="section"><h3>CB Reference (Triangle)</h3>
@@ -881,9 +944,14 @@ function compute(){
 
   if(t==='gybe90'){
     const off=num('gateOff',93);
+    // INPUT ADAPTER ONLY: start-line reference is converted to the existing
+    // leeward-mark→Mark 1 leg. The 90°-gybe geometry itself is unchanged.
+    const beatLenM = el('courseLenRef').value==='start'
+      ? Math.max(0, lenM - off)
+      : lenM;
     const p3 = add(pMid, scale(uA,off));
-    const p1 = add(p3, scale(uA, lenM));
-    const rM = lenM*0.71;
+    const p1 = add(p3, scale(uA, beatLenM));
+    const rM = beatLenM*0.71;
     const p2 = add(p1, scale(vec(axis+225), rM));
 
     html += `<div class="section"><h3>CB Reference (90° Gybe)</h3>
@@ -954,8 +1022,8 @@ function compute(){
 }
 
 [
-  'courseType','axis','lineLen','gateOff',
-  'trapAngle','gate4W','gate3W','noGate4',
+  'courseType','axis','lineLen','gateOff','courseLenRef',
+  'trapAngle','gate4W','gate3W','noGate4','trapInnerOn','trapInnerDropM',
   'wlGate4W','wlGateOff','wlGateOffUnit','wlOfficePosition','wlAng','wlNoGate4','showPlanner'
 ].forEach(id=>{
   const e=el(id);
