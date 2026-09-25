@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Multi Course Race Calculator — Geometry Frozen v1.1</title>
+<title>Multi Course Race Calculator — Geometry Frozen v1.2</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="manifest" href="./manifest.webmanifest">
 <meta name="theme-color" content="#0d355f">
@@ -35,7 +35,7 @@
 </head>
 <body>
 
-<h2>Multi Course Race Calculator — Planner Beta 2.5</h2>
+<h2>Multi Course Race Calculator — Planner Beta 2.6</h2>
 <p class="build">Includes: optional Course Length Calculator, Trapezoid (60/70/80), Triangle, 90° Gybe, Windward-Leeward (with optional spreader 1a).</p>
 
 <div class="plannerToggle">
@@ -196,6 +196,15 @@
   </label>
 
   <label style="font-weight:900">
+    <input type="checkbox" id="variableOuterOn" style="transform:scale(1.2);margin-right:8px">
+    Variable Outer Course?
+  </label>
+
+  <label id="variableOuterPctWrap" class="hidden">Outer Course % <span class="muted">(100% = traditional)</span>
+    <input id="variableOuterPct" type="number" min="1" step="0.1" value="100">
+  </label>
+
+  <label style="font-weight:900">
     <input type="checkbox" id="trapInnerOn" style="transform:scale(1.2);margin-right:8px">
     Add inner marks 1a &amp; 2a
   </label>
@@ -277,7 +286,7 @@
 </div>
 
 <div class="section" id="results"></div>
-<div class="footer">Multi Course Race Calculator — Geometry Frozen v1.1 © Peter Keats 2026</div>
+<div class="footer">Multi Course Race Calculator — Geometry Frozen v1.2 © Peter Keats 2026</div>
 
 <script>
 const SPEED_DATA = {
@@ -799,6 +808,8 @@ function compute(){
   show('wlInputs', t==='windwardleeward');
   show('courseLenRefWrap', t!=='windwardleeward');
   show('trapInnerDropWrap', t==='trapezoid' && el('trapInnerOn').checked);
+  const variableOuterOn = t==='trapezoid' && el('variableOuterOn').checked;
+  show('variableOuterPctWrap', variableOuterOn);
   const wlOfficePosition = el('wlOfficePosition').value;
   show('wlGateOffWrap', t==='windwardleeward' && wlOfficePosition==='custom');
   show('wlGateOffUnitWrap', t==='windwardleeward' && wlOfficePosition==='custom');
@@ -855,7 +866,13 @@ function compute(){
 
     const p1 = add(gate4C, scale(u41, beatLenM));
     const p2 = add(p1, scale(u12, rM));
-    const gate3C = add(p2, scale(u23, beatLenM));
+
+    // OPTIONAL VARIABLE OUTER COURSE — Marks 1 and 2 remain frozen.
+    // Only Gate 3 / Mark 3 moves along the existing 2→3 direction.
+    // 100% reproduces the traditional frozen trapezoid exactly.
+    const outerPct = variableOuterOn ? Math.max(1, num('variableOuterPct',100)) : 100;
+    const outerLegM = beatLenM * (outerPct/100);
+    const gate3C = add(p2, scale(u23, outerLegM));
     const p3P = add(gate3C, scale(uGate, g3w/2));
 
     // DERIVED POINTS ONLY — do not alter Marks 1, 2, Gate 3 or Gate 4.
@@ -1023,7 +1040,7 @@ function compute(){
 
 [
   'courseType','axis','lineLen','gateOff','courseLenRef',
-  'trapAngle','gate4W','gate3W','noGate4','trapInnerOn','trapInnerDropM',
+  'trapAngle','gate4W','gate3W','noGate4','variableOuterOn','variableOuterPct','trapInnerOn','trapInnerDropM',
   'wlGate4W','wlGateOff','wlGateOffUnit','wlOfficePosition','wlAng','wlNoGate4','showPlanner'
 ].forEach(id=>{
   const e=el(id);
