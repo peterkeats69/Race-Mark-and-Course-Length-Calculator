@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Multi Course Race Calculator — Geometry Frozen v1.2</title>
+<title>Multi Course Race Calculator — Geometry Frozen v1.2 — Variable Triangle Preview</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="manifest" href="./manifest.webmanifest">
 <meta name="theme-color" content="#0d355f">
@@ -136,6 +136,7 @@
     <select id="courseType">
       <option value="trapezoid" selected>Trapezoid</option>
       <option value="triangle">Triangle (equal legs)</option>
+      <option value="triangleVariable">Triangle — Variable Angles</option>
       <option value="gybe90">Triangle 90° gybe (71% reaches)</option>
       <option value="windwardleeward">Windward-Leeward</option>
     </select>
@@ -163,6 +164,23 @@
       <option value="start">Start-line midpoint</option>
     </select>
   </label>
+</div>
+
+<div id="variableTriangleInputs" class="row hidden">
+  <label>Angle at Mark 1
+    <input id="triAng1" type="number" min="1" max="178" step="1" value="60">
+    <span id="triAuto1" class="muted"></span>
+  </label>
+  <label>Angle at Mark 2
+    <input id="triAng2" type="number" min="1" max="178" step="1" value="60">
+    <span id="triAuto2" class="muted"></span>
+  </label>
+  <label>Angle at Mark 3
+    <input id="triAng3" type="number" min="1" max="178" step="1" value="60">
+    <span id="triAuto3" class="muted"></span>
+  </label>
+  <button id="triReset" type="button">Reset angles</button>
+  <div class="note">Change any two angles; the third becomes Auto so the triangle always totals 180°. Click the Auto angle to make it editable again.</div>
 </div>
 
 <div id="trapInputs" class="row">
@@ -202,6 +220,19 @@
 
   <label id="variableOuterPctWrap" class="hidden">Outer Course % <span class="muted">(100% = traditional)</span>
     <input id="variableOuterPct" type="number" min="1" step="0.1" value="100">
+  </label>
+
+  <label style="font-weight:900">
+    <input type="checkbox" id="mark5FinishOn" style="transform:scale(1.2);margin-right:8px">
+    Add Mark 5 finish
+  </label>
+
+  <label id="mark5AngleWrap" class="hidden">Mark 5 → Finish angle off wind
+    <input id="mark5Angle" type="number" min="1" max="179" step="1" value="60">
+  </label>
+
+  <label id="finishLineLenWrap" class="hidden">Finish line length (m)
+    <input id="finishLineLen" type="number" min="1" step="1" value="50">
   </label>
 
   <label style="font-weight:900">
@@ -286,7 +317,7 @@
 </div>
 
 <div class="section" id="results"></div>
-<div class="footer">Multi Course Race Calculator — Geometry Frozen v1.2 © Peter Keats 2026</div>
+<div class="footer">Multi Course Race Calculator — Geometry Frozen v1.2 — Variable Triangle Preview © Peter Keats 2026</div>
 
 <script>
 const SPEED_DATA = {
@@ -804,12 +835,16 @@ function compute(){
   const lenM=courseNm*1852;
 
   show('trapInputs', t==='trapezoid');
+  show('variableTriangleInputs', t==='triangleVariable');
   show('hybridRow', t==='trapezoid');
   show('wlInputs', t==='windwardleeward');
   show('courseLenRefWrap', t!=='windwardleeward');
   show('trapInnerDropWrap', t==='trapezoid' && el('trapInnerOn').checked);
   const variableOuterOn = t==='trapezoid' && el('variableOuterOn').checked;
   show('variableOuterPctWrap', variableOuterOn);
+  const mark5FinishOn = t==='trapezoid' && el('mark5FinishOn').checked;
+  show('mark5AngleWrap', mark5FinishOn);
+  show('finishLineLenWrap', mark5FinishOn);
   const wlOfficePosition = el('wlOfficePosition').value;
   show('wlGateOffWrap', t==='windwardleeward' && wlOfficePosition==='custom');
   show('wlGateOffUnitWrap', t==='windwardleeward' && wlOfficePosition==='custom');
@@ -875,6 +910,26 @@ function compute(){
     const gate3C = add(p2, scale(u23, outerLegM));
     const p3P = add(gate3C, scale(uGate, g3w/2));
 
+    // OPTIONAL MARK 5 FINISH — DERIVED ONLY. Frozen trapezoid points above are untouched.
+    // Race officer chooses the final-leg angle off the wind. The finish line is then
+    // laid perpendicular to that leg, with the committee boat as one end.
+    // The 2/3 point from 3P toward the finish pin is a GUIDE: Mark 5 is the nearest
+    // point on the required final-leg line to that guide, so changing the angle moves M5.
+    let p5=null, pFinishPin=null, p5Guide=null, mark5GuideMiss=0;
+    if(mark5FinishOn){
+      const finishAng = num('mark5Angle',60);
+      const finishLineLen = Math.max(1, num('finishLineLen',50));
+      const uFinishLeg = vec(axis + finishAng);
+      const uFinishLine = vec(axis + finishAng + 90); // exactly perpendicular; pin lies on the downwind-ish side of CB
+      pFinishPin = add(pCB, scale(uFinishLine, finishLineLen));
+      p5Guide = add(p3P, scale({x:pFinishPin.x-p3P.x,y:pFinishPin.y-p3P.y}, 2/3));
+      // Project the 2/3 guide onto the line through the finish pin parallel to the final leg.
+      const gx=p5Guide.x-pFinishPin.x, gy=p5Guide.y-pFinishPin.y;
+      const along = gx*uFinishLeg.x + gy*uFinishLeg.y;
+      p5 = add(pFinishPin, scale(uFinishLeg, along));
+      mark5GuideMiss = Math.hypot(p5.x-p5Guide.x,p5.y-p5Guide.y);
+    }
+
     // DERIVED POINTS ONLY — do not alter Marks 1, 2, Gate 3 or Gate 4.
     // 1a and 2a are shifted equally down the existing course axis,
     // so the 1a→2a reach is exactly the same vector/width as 1→2.
@@ -899,7 +954,22 @@ function compute(){
       ${card("CB","2",pCB,p2)}
       ${innerOn ? card("CB","2a",pCB,p2a) : ""}
       ${card("CB","3P",pCB,p3P)}
+      ${mark5FinishOn ? card("CB","5",pCB,p5) : ""}
+      ${mark5FinishOn ? card("CB","Finish Pin",pCB,pFinishPin) : ""}
     </div>`;
+
+    if(mark5FinishOn){
+      html += `<div class="section"><h3>Mark 5 Finish</h3>
+        ${card("3P","5",p3P,p5)}
+        ${card("5","Finish Pin",p5,pFinishPin)}
+        ${card("CB","Finish Pin",pCB,pFinishPin)}
+        ${resultCard("Finish geometry", [
+          `Selected final-leg angle: ${num('mark5Angle',60).toFixed(0)}° off wind`,
+          `Finish line: ${Math.round(Math.max(1,num('finishLineLen',50)))} m and perpendicular to 5 → Finish`,
+          `Mark 5 uses the ⅔ position as a guide (adjustment from guide: ${Math.round(mark5GuideMiss)} m)`
+        ])}
+      </div>`;
+    }
 
     if(hybOn){
       let legM=num('hybLegM',0);
@@ -933,6 +1003,38 @@ function compute(){
         ${card("2a","3P",p2a,p3P)}
         ${card("3P","4P",p3P,p4P)}
       </div>`;
+    }
+  }
+
+  if(t==='triangleVariable'){
+    const off=num('gateOff',93);
+    // NEW COURSE TYPE ONLY. Existing triangle/trapezoid/WL geometry is untouched.
+    // Mark 3 and Mark 1 use the same established leeward/upwind anchors.
+    const beatLenM = el('courseLenRef').value==='start'
+      ? Math.max(0, lenM - off)
+      : lenM;
+    const p3 = add(pMid, scale(uA,off));
+    const p1 = add(p3, scale(uA, beatLenM));
+
+    const A=num('triAng1',60), B=num('triAng2',60), C=num('triAng3',60);
+    const valid=A>0 && B>0 && C>0 && Math.abs((A+B+C)-180)<0.05 && Math.sin(B*Math.PI/180)>0;
+    if(valid){
+      // Known side 3→1 is opposite angle B. Sine rule derives the other sides.
+      const side12 = beatLenM * Math.sin(C*Math.PI/180) / Math.sin(B*Math.PI/180);
+      const p2 = add(p1, scale(vec(axis+180+A), side12));
+      html += `<div class="section"><h3>CB Reference (Variable-Angle Triangle)</h3>
+        ${card("CB","1",pCB,p1)}
+        ${card("CB","2",pCB,p2)}
+        ${card("CB","3",pCB,p3)}
+      </div>
+      <div class="section"><h3>Course Legs</h3>
+        ${card("3","1",p3,p1)}
+        ${card("1","2",p1,p2)}
+        ${card("2","3",p2,p3)}
+        ${resultCard("Triangle angles", [`Mark 1: ${A.toFixed(1)}°`, `Mark 2: ${B.toFixed(1)}°`, `Mark 3: ${C.toFixed(1)}°`, `Total: ${(A+B+C).toFixed(1)}°`])}
+      </div>`;
+    } else {
+      html += `<div class="section"><h3>Variable-Angle Triangle</h3><div class="note"><b>Angles must all be greater than 0° and total 180°.</b></div></div>`;
     }
   }
 
@@ -1040,7 +1142,8 @@ function compute(){
 
 [
   'courseType','axis','lineLen','gateOff','courseLenRef',
-  'trapAngle','gate4W','gate3W','noGate4','variableOuterOn','variableOuterPct','trapInnerOn','trapInnerDropM',
+  'triAng1','triAng2','triAng3',
+  'trapAngle','gate4W','gate3W','noGate4','variableOuterOn','variableOuterPct','mark5FinishOn','mark5Angle','finishLineLen','trapInnerOn','trapInnerDropM',
   'wlGate4W','wlGateOff','wlGateOffUnit','wlOfficePosition','wlAng','wlNoGate4','showPlanner'
 ].forEach(id=>{
   const e=el(id);
@@ -1111,6 +1214,59 @@ el('showPlanner').addEventListener('change', ()=>{
   if(el('showPlanner').checked) computePlanner(false);
 });
 
+
+// Variable-angle triangle: the last two distinct angles changed are the controllers.
+// The remaining angle becomes Auto and is always 180° minus those two.
+const triIds=['triAng1','triAng2','triAng3'];
+let triControllers=[];
+let triAuto=null;
+let triInternal=false;
+function triPaint(){
+  triIds.forEach((id,i)=>{
+    const inp=el(id), tag=el('triAuto'+(i+1));
+    const isAuto=(id===triAuto);
+    inp.readOnly=isAuto;
+    if(tag) tag.textContent=isAuto?'Auto':'';
+    inp.title=isAuto?'Calculated automatically. Click to make this angle editable.':'';
+  });
+}
+function triRecalc(){
+  if(!triAuto || triControllers.length<2) return;
+  const a=num(triControllers[0],60), b=num(triControllers[1],60);
+  const v=180-a-b;
+  triInternal=true;
+  el(triAuto).value = v>0 ? (Math.round(v*10)/10) : v.toFixed(1);
+  triInternal=false;
+}
+function triChanged(id){
+  if(triInternal) return;
+  if(id===triAuto) return;
+  triControllers=triControllers.filter(x=>x!==id);
+  triControllers.push(id);
+  if(triControllers.length>=2){
+    triControllers=triControllers.slice(-2);
+    triAuto=triIds.find(x=>!triControllers.includes(x));
+    triRecalc(); triPaint(); compute();
+  }
+}
+triIds.forEach(id=>{
+  el(id).addEventListener('input',()=>triChanged(id));
+  el(id).addEventListener('click',()=>{
+    if(id===triAuto){
+      // Make the clicked Auto angle a controller; the oldest controller becomes Auto.
+      const old=triControllers[0];
+      triControllers=[triControllers[1],id];
+      triAuto=old;
+      triRecalc(); triPaint(); compute();
+      setTimeout(()=>{el(id).focus(); el(id).select();},0);
+    }
+  });
+});
+el('triReset').addEventListener('click',()=>{
+  triInternal=true; triIds.forEach(id=>el(id).value='60'); triInternal=false;
+  triControllers=[]; triAuto=null; triPaint(); compute();
+});
+triPaint();
 
 populatePlanner();
 populateHybridClassSelectors();
