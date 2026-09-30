@@ -231,8 +231,12 @@
     <input id="mark5Angle" type="number" min="1" max="179" step="1" value="80">
   </label>
 
-  <label id="mark5OffsetWrap" class="hidden">Mark 5 downwind offset (m)
+  <label id="mark5OffsetWrap" class="hidden">Mark 5 guide offset downwind (m)
     <input id="mark5Offset" type="number" min="0" step="1" value="100">
+  </label>
+
+  <label id="finishLineLenWrap" class="hidden">Finish line length (m)
+    <input id="finishLineLen" type="number" min="1" step="1" value="50">
   </label>
 
   <label style="font-weight:900">
@@ -845,6 +849,7 @@ function compute(){
   const mark5FinishOn = t==='trapezoid' && el('mark5FinishOn').checked;
   show('mark5AngleWrap', mark5FinishOn);
   show('mark5OffsetWrap', mark5FinishOn);
+  show('finishLineLenWrap', mark5FinishOn);
   const wlOfficePosition = el('wlOfficePosition').value;
   show('wlGateOffWrap', t==='windwardleeward' && wlOfficePosition==='custom');
   show('wlGateOffUnitWrap', t==='windwardleeward' && wlOfficePosition==='custom');
@@ -911,29 +916,28 @@ function compute(){
     const p3P = add(gate3C, scale(uGate, g3w/2));
 
     // OPTIONAL MARK 5 FINISH — DERIVED ONLY. Frozen trapezoid points above are untouched.
-    // Bryan prototype: M5 starts at the midpoint of 3P→CB, then moves directly downwind
-    // by a user-set offset (default 100 m). The final approach is user-set (default 80°
-    // off the wind). The finish line passes through CB and is exactly 90° to that approach.
-    // Its centre is the intersection of the M5 approach line and the finish-line axis;
-    // the pin is then placed the same distance beyond the centre, making CB and Pin the ends.
-    let p5=null, pFinishCentre=null, pFinishPin=null, finishLineLen=0, finishGeometryOK=true;
+    // Beta 3.0: finish line length and approach angle are hard constraints.
+    // Mark 5 is the movable point. Its preferred/guide location is the midpoint of 3P→CB
+    // shifted directly downwind by the user-set guide offset (default 100 m).
+    // The actual M5 is the closest point on the required approach line to that guide.
+    let p5=null, p5Guide=null, pFinishCentre=null, pFinishPin=null, finishLineLen=0, guideShift=0;
     if(mark5FinishOn){
       const finishAng = num('mark5Angle',80);
       const mark5Offset = Math.max(0, num('mark5Offset',100));
+      finishLineLen = Math.max(1, num('finishLineLen',50));
       const p35Mid = add(p3P, scale({x:pCB.x-p3P.x,y:pCB.y-p3P.y}, 0.5));
-      p5 = add(p35Mid, scale(vec(axis + 180), mark5Offset));
+      p5Guide = add(p35Mid, scale(vec(axis + 180), mark5Offset));
 
       const uFinishLeg = vec(axis + finishAng);
       const uFinishLine = vec(axis + finishAng + 90); // default = wind axis +170°
-      // Because these vectors are perpendicular, the intersection is a simple projection.
-      const dx=pCB.x-p5.x, dy=pCB.y-p5.y;
-      const alongLeg = dx*uFinishLeg.x + dy*uFinishLeg.y;
-      pFinishCentre = add(p5, scale(uFinishLeg, alongLeg));
-      const cx=pFinishCentre.x-pCB.x, cy=pFinishCentre.y-pCB.y;
-      const halfLine = cx*uFinishLine.x + cy*uFinishLine.y;
-      finishGeometryOK = halfLine > 0;
-      pFinishPin = add(pCB, scale(uFinishLine, 2*halfLine));
-      finishLineLen = Math.abs(2*halfLine);
+      pFinishPin = add(pCB, scale(uFinishLine, finishLineLen));
+      pFinishCentre = add(pCB, scale(uFinishLine, finishLineLen/2));
+
+      // Project the guide point onto the required approach line through Finish Centre.
+      const gx=p5Guide.x-pFinishCentre.x, gy=p5Guide.y-pFinishCentre.y;
+      const along = gx*uFinishLeg.x + gy*uFinishLeg.y;
+      p5 = add(pFinishCentre, scale(uFinishLeg, along));
+      guideShift = Math.hypot(p5.x-p5Guide.x, p5.y-p5Guide.y);
     }
 
     // DERIVED POINTS ONLY — do not alter Marks 1, 2, Gate 3 or Gate 4.
@@ -972,11 +976,11 @@ function compute(){
         ${card("CB","Finish Pin",pCB,pFinishPin)}
         ${resultCard("Finish geometry", [
           `Selected approach angle: ${num('mark5Angle',80).toFixed(0)}° off wind`,
-          `Mark 5: 50% point from 3P to CB, then ${Math.round(Math.max(0,num('mark5Offset',100)))} m directly downwind`,
+          `Mark 5 guide: 50% point from 3P to CB, then ${Math.round(Math.max(0,num('mark5Offset',100)))} m directly downwind`,
+          `Mark 5 moved ${Math.round(guideShift)} m from that guide to satisfy the finish geometry`,
           `CB → Finish Pin line bearing: wind axis + ${(num('mark5Angle',80)+90).toFixed(0)}°`,
-          `Calculated finish-line length: ${Math.round(finishLineLen)} m`,
-          `Finish line is perpendicular to 5 → Finish Centre`,
-          finishGeometryOK ? `Finish pin lies on the selected CB → Pin side` : `CHECK: selected geometry puts the finish centre on the opposite side of CB`
+          `Selected finish-line length: ${Math.round(finishLineLen)} m`,
+          `Finish line is perpendicular to 5 → Finish Centre`
         ])}
       </div>`;
     }
@@ -1153,7 +1157,7 @@ function compute(){
 [
   'courseType','axis','lineLen','gateOff','courseLenRef',
   'triAng1','triAng2','triAng3',
-  'trapAngle','gate4W','gate3W','noGate4','variableOuterOn','variableOuterPct','mark5FinishOn','mark5Angle','mark5Offset','trapInnerOn','trapInnerDropM',
+  'trapAngle','gate4W','gate3W','noGate4','variableOuterOn','variableOuterPct','mark5FinishOn','mark5Angle','mark5Offset','finishLineLen','trapInnerOn','trapInnerDropM',
   'wlGate4W','wlGateOff','wlGateOffUnit','wlOfficePosition','wlAng','wlNoGate4','showPlanner'
 ].forEach(id=>{
   const e=el(id);
